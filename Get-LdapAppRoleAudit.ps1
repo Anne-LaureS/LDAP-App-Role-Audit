@@ -80,15 +80,26 @@ Add-Type -AssemblyName System.Drawing
 
 function Get-MemberNames {
     # uniqueMember renvoie des DN complets (ex: "uid=curie,dc=example,dc=com"), pas des noms
-    # lisibles. On extrait la valeur du premier RDN (ce qu'il y a avant la 1ère virgule, après
-    # le "=") plutôt que de faire une recherche LDAP supplémentaire par membre — plus rapide,
-    # suffisant pour identifier qui est qui dans le CSV.
-    param([string[]]$MemberDNs)
+    # lisibles. On extrait la valeur du premier RDN (avant la 1ère virgule, après le "=")
+    # plutôt que de faire une recherche LDAP supplémentaire par membre — plus rapide, suffisant
+    # pour identifier qui est qui dans le CSV.
+    #
+    # Pas de type [string[]] sur le paramètre : System.DirectoryServices.Protocols renvoie
+    # certains attributs (dont uniqueMember, selon le serveur) en byte[] plutôt qu'en string.
+    # Si on force [string[]], PowerShell convertit chaque byte[] en sa représentation décimale
+    # espacée ("117 105 100 61...") au lieu du texte — d'où des chiffres au lieu des lettres
+    # dans le CSV. On détecte et décode explicitement le byte[] en UTF-8 à la place.
+    param($MemberDNs)
 
     if (-not $MemberDNs) { return "" }
 
     ($MemberDNs | ForEach-Object {
-        ($_ -split ',')[0] -replace '^[^=]+=', ''
+        $dn = if ($_ -is [byte[]]) {
+            [System.Text.Encoding]::UTF8.GetString($_)
+        } else {
+            [string]$_
+        }
+        ($dn -split ',')[0] -replace '^[^=]+=', ''
     }) -join "; "
 }
 

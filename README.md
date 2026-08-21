@@ -82,6 +82,12 @@ ci-dessus :
   string[]` d'un constructeur .NET (ex: `SearchRequest`). Un littéral `@(...)` passé
   directement en argument peut être silencieusement ignoré selon la plateforme — le filtre
   s'exécute sans erreur, mais aucun attribut n'est retourné.
+- **Valeurs d'attributs multi-valeurs comme `uniqueMember`** : `System.DirectoryServices.Protocols`
+  peut les renvoyer en `byte[]` plutôt qu'en texte selon le serveur/schéma. Si le paramètre
+  d'une fonction est typé `[string[]]`, PowerShell convertit alors chaque `byte[]` en sa
+  représentation décimale espacée (des chiffres) au lieu du texte attendu — sans erreur, juste
+  un résultat silencieusement faux. Décoder explicitement en UTF-8 quand `$_ -is [byte[]]`
+  (voir `Get-MemberNames` dans le script).
 
 La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre
 le serveur public ci-dessus avant publication.
