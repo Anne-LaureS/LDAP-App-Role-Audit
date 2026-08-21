@@ -48,7 +48,7 @@ Identifiants à saisir dans les popups (serveur de démo public en lecture seule
 
 ### Exemple de sortie
 
-[`sample-output.csv`](sample-output.csv) — export réel obtenu contre le serveur de démo
+[`LDAP_Applications_Roles_Audit.csv`](LDAP_Applications_Roles_Audit.csv) — export réel obtenu contre le serveur de démo
 ci-dessus :
 
 | Application | AppDescription | Role | RoleDescription | MemberCount |
