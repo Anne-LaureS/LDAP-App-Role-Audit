@@ -55,7 +55,11 @@ ci-dessus :
 |---|---|---|---|---|---|
 | Chemists | | | | 4 | curie; boyle; nobel; pasteur |
 | Mathematicians | | | | 5 | euclid; riemann; euler; gauss; test |
+| Scientists | | | | 4 | einstein; tesla; newton; galileo |
 | Scientists | | Italians | | 1 | tesla |
+
+Une ligne `Role` vide = accès direct à l'application elle-même (pas via un rôle spécifique).
+`Scientists` a 2 lignes : 4 membres directs, et en plus `tesla` qui a aussi le rôle `Italians`.
 
 - `MemberCount` = nombre de membres (`uniqueMember`) de cette application/rôle dans l'annuaire.
 - `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
@@ -88,6 +92,12 @@ ci-dessus :
   représentation décimale espacée (des chiffres) au lieu du texte attendu — sans erreur, juste
   un résultat silencieusement faux. Décoder explicitement en UTF-8 quand `$_ -is [byte[]]`
   (voir `Get-MemberNames` dans le script).
+- **Accès direct à une application vs accès via un rôle** : quand une application a des
+  sous-rôles, ne pas se limiter à eux — ses membres directs (`uniqueMember` sur l'entrée de
+  l'application elle-même) sont un accès distinct, à exporter en plus, pas à la place. Une
+  application avec des rôles peut très bien avoir aussi des membres directs (vérifié :
+  `Scientists` a 4 membres directs, en plus du rôle `Italians` porté par 1 d'entre eux) — s'en
+  tenir uniquement aux rôles sous-estime silencieusement les accès réels.
 
 La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre
 le serveur public ci-dessus avant publication.

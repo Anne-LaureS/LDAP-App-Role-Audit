@@ -281,18 +281,19 @@ foreach ($appEntry in $searchResponse.Entries) {
     $roleSearchResponse = $ldapConnection.SendRequest($roleSearchRequest)
     Write-Host "   Rôles trouvés : $($roleSearchResponse.Entries.Count)"
 
-    if ($roleSearchResponse.Entries.Count -eq 0) {
-        # Application sans sous-rôle : on garde quand même une ligne pour ne pas la perdre du rapport
-        [void]$resultArray.Add([PSCustomObject]@{
-            Application     = $appName
-            AppDescription  = $appDescription
-            Role            = ""
-            RoleDescription = ""
-            MemberCount     = if ($appEntry.Attributes["uniqueMember"]) { $appEntry.Attributes["uniqueMember"].Count } else { 0 }
-            Members         = Get-MemberNames -MemberDNs $appEntry.Attributes["uniqueMember"]
-        })
-        continue
-    }
+    # Toujours une ligne pour l'appartenance DIRECTE à l'application elle-même (Role vide) —
+    # même quand l'application a aussi des rôles. Sans ça, les membres directs d'une
+    # application qui a par ailleurs des sous-rôles étaient silencieusement absents du CSV
+    # (vérifié : "Scientists" a 4 membres directs en plus du rôle "Italians" — un rôle en
+    # moins n'était pas grave, mais des accès en moins sur un outil d'audit, si).
+    [void]$resultArray.Add([PSCustomObject]@{
+        Application     = $appName
+        AppDescription  = $appDescription
+        Role            = ""
+        RoleDescription = ""
+        MemberCount     = if ($appEntry.Attributes["uniqueMember"]) { $appEntry.Attributes["uniqueMember"].Count } else { 0 }
+        Members         = Get-MemberNames -MemberDNs $appEntry.Attributes["uniqueMember"]
+    })
 
     foreach ($roleEntry in $roleSearchResponse.Entries) {
         [void]$resultArray.Add([PSCustomObject]@{
