@@ -11,7 +11,7 @@ qui a accès à quoi, via quel rôle. Authentification et sélection des applica
 
 ⚠️ **Windows uniquement** — `System.Windows.Forms` (les 2 popups) n'existe pas sous Linux/macOS.
 
-## 🎯 Ce que ça fait
+## ⚙️ Ce que ça fait
 
 1. **Popup 1** : identifiant (DN) + mot de passe → authentification LDAP (LDAPS par défaut)
 2. **Popup 2** : un ou plusieurs identifiants d'application à interroger (1 par ligne)
@@ -23,7 +23,7 @@ qui a accès à quoi, via quel rôle. Authentification et sélection des applica
 Schéma utilisé : `groupOfUniqueNames` (RFC 2256, standard), pas un schéma propriétaire —
 `-AppObjectClass`/`-RoleObjectClass` permettent d'adapter aux classes réelles de votre annuaire.
 
-## 🚀 Utilisation
+## ▶️ Utilisation
 
 ```powershell
 .\Get-LdapAppRoleAudit.ps1 -LdapServer "votre-ldap.exemple.com" -BaseDN "ou=Applications,dc=exemple,dc=com"
