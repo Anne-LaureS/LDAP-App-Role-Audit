@@ -51,14 +51,15 @@ Identifiants à saisir dans les popups (serveur de démo public en lecture seule
 [`LDAP_Applications_Roles_Audit.csv`](LDAP_Applications_Roles_Audit.csv) — export réel obtenu contre le serveur de démo
 ci-dessus :
 
-| Application | AppDescription | Role | RoleDescription | MemberCount |
-|---|---|---|---|---|
-| Chemists | | | | 4 |
-| Mathematicians | | | | 5 |
-| Scientists | | Italians | | 1 |
+| Application | AppDescription | Role | RoleDescription | MemberCount | Members |
+|---|---|---|---|---|---|
+| Chemists | | | | 4 | curie; boyle; nobel; pasteur |
+| Mathematicians | | | | 5 | euclid; riemann; euler; gauss; test |
+| Scientists | | Italians | | 1 | tesla |
 
-`MemberCount` = nombre de membres (`uniqueMember`) de cette application/rôle dans l'annuaire —
-ex: le rôle `Italians` sous `Scientists` a 1 membre.
+- `MemberCount` = nombre de membres (`uniqueMember`) de cette application/rôle dans l'annuaire.
+- `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
+  → `curie`) — pas de recherche LDAP supplémentaire par membre, juste le RDN.
 
 ## 🔐 Sécurité
 

@@ -78,6 +78,20 @@ Add-Type -AssemblyName System.DirectoryServices.Protocols
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+function Get-MemberNames {
+    # uniqueMember renvoie des DN complets (ex: "uid=curie,dc=example,dc=com"), pas des noms
+    # lisibles. On extrait la valeur du premier RDN (ce qu'il y a avant la 1ère virgule, après
+    # le "=") plutôt que de faire une recherche LDAP supplémentaire par membre — plus rapide,
+    # suffisant pour identifier qui est qui dans le CSV.
+    param([string[]]$MemberDNs)
+
+    if (-not $MemberDNs) { return "" }
+
+    ($MemberDNs | ForEach-Object {
+        ($_ -split ',')[0] -replace '^[^=]+=', ''
+    }) -join "; "
+}
+
 ###############################################################
 # POPUP 1 — LOGIN
 ###############################################################
@@ -264,6 +278,7 @@ foreach ($appEntry in $searchResponse.Entries) {
             Role            = ""
             RoleDescription = ""
             MemberCount     = if ($appEntry.Attributes["uniqueMember"]) { $appEntry.Attributes["uniqueMember"].Count } else { 0 }
+            Members         = Get-MemberNames -MemberDNs $appEntry.Attributes["uniqueMember"]
         })
         continue
     }
@@ -275,6 +290,7 @@ foreach ($appEntry in $searchResponse.Entries) {
             Role            = $roleEntry.Attributes["cn"][0]
             RoleDescription = if ($roleEntry.Attributes["description"]) { $roleEntry.Attributes["description"][0] } else { "" }
             MemberCount     = if ($roleEntry.Attributes["uniqueMember"]) { $roleEntry.Attributes["uniqueMember"].Count } else { 0 }
+            Members         = Get-MemberNames -MemberDNs $roleEntry.Attributes["uniqueMember"]
         })
     }
 }
