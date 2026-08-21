@@ -37,10 +37,28 @@ Les 2 popups s'ouvrent ensuite pour l'authentification et la sélection des appl
 .\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
 ```
 
-Dans le popup login : `cn=read-only-admin,dc=example,dc=com` / `password`
-(serveur de démo public en lecture seule, voir
-[forumsys.com](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)).
-Dans le popup applications, un identifiant par ligne : `scientists`, `mathematicians`, `chemists`.
+Identifiants à saisir dans les popups (serveur de démo public en lecture seule, voir
+[forumsys.com](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)) :
+
+| Popup | Champ | Valeur |
+|---|---|---|
+| 1 — Login | Identifiant (DN) | `cn=read-only-admin,dc=example,dc=com` |
+| 1 — Login | Mot de passe | `password` |
+| 2 — Applications | (une par ligne) | `scientists`, `mathematicians`, `chemists` |
+
+### Exemple de sortie
+
+[`sample-output.csv`](sample-output.csv) — export réel obtenu contre le serveur de démo
+ci-dessus :
+
+| Application | AppDescription | Role | RoleDescription | MemberCount |
+|---|---|---|---|---|
+| Chemists | | | | 4 |
+| Mathematicians | | | | 5 |
+| Scientists | | Italians | | 1 |
+
+`MemberCount` = nombre de membres (`uniqueMember`) de cette application/rôle dans l'annuaire —
+ex: le rôle `Italians` sous `Scientists` a 1 membre.
 
 ## 🔐 Sécurité
 
