@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Interroge un annuaire LDAP pour produire un export CSV Application / Rôle / Description,
     utile pour des audits d'accès applicatifs (IAM/GRC). Authentification et sélection des
