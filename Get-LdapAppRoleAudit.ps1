@@ -1,16 +1,23 @@
 <#
 .SYNOPSIS
     Interroge un annuaire LDAP pour produire un export CSV Application / Rôle / Description,
-    utile pour des audits d'accès applicatifs (IAM/GRC).
+    utile pour des audits d'accès applicatifs (IAM/GRC). Authentification et sélection des
+    applications via 2 popups Windows Forms.
 
 .DESCRIPTION
-    Recherche, sous une base DN donnée, les groupes correspondant à un ensemble d'identifiants
-    d'application fournis par l'opérateur, puis pour chacun, recherche ses sous-groupes
-    (assimilés ici à des rôles) et exporte le tout en CSV.
+    Popup 1 : identifiant + mot de passe (authentification LDAP).
+    Popup 2 : un ou plusieurs identifiants d'application à interroger (1 par ligne).
+
+    Recherche ensuite, sous une base DN donnée, les groupes correspondant aux identifiants
+    saisis, puis pour chacun, recherche ses sous-groupes (assimilés ici à des rôles), et
+    exporte le tout en CSV.
 
     Schéma utilisé ici : objectClass standard `groupOfUniqueNames` (RFC 2256), pas un schéma
     propriétaire — à adapter aux object classes/attributs réels de votre annuaire (ex:
     remplacer -AppObjectClass par la classe applicative de votre organisation).
+
+    ⚠️ Popups Windows Forms : ce script ne fonctionne que sous Windows (PowerShell 5.1 ou
+    PowerShell 7+ sur Windows) — System.Windows.Forms n'existe pas sous Linux/macOS.
 
 .PARAMETER LdapServer
     Nom d'hôte du serveur LDAP.
@@ -25,24 +32,17 @@
 .PARAMETER BaseDN
     Base DN sous laquelle chercher les applications.
 
-.PARAMETER BindDN
-    DN utilisé pour l'authentification.
-
-.PARAMETER AppIds
-    Un ou plusieurs identifiants d'application à rechercher (ex: noms de groupes).
-
 .PARAMETER AppObjectClass
     objectClass identifiant une "application" dans votre annuaire. `groupOfUniqueNames` par
     défaut (générique) — à remplacer par la classe propre à votre organisation le cas échéant.
 
 .EXAMPLE
-    # Démo contre le serveur de test public ldap.forumsys.com (lecture seule, sans authentification
-    # applicative réelle — voir "NOTE SÉCURITÉ" plus bas pour -UseTls:$false)
-    .\Get-LdapAppRoleAudit.ps1 `
-        -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false `
-        -BaseDN "dc=example,dc=com" `
-        -BindDN "cn=read-only-admin,dc=example,dc=com" `
-        -AppIds "scientists","mathematicians","chemists"
+    # Démo contre le serveur de test public ldap.forumsys.com (lecture seule) — voir
+    # "NOTE SÉCURITÉ" plus bas pour -UseTls:$false. Dans le popup login, saisir :
+    #   Identifiant : cn=read-only-admin,dc=example,dc=com
+    #   Mot de passe : password
+    # Dans le popup applications, saisir (1 par ligne) : scientists / mathematicians / chemists
+    .\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
 
 .NOTES
     NOTE SÉCURITÉ — pourquoi LDAPS par défaut :
@@ -68,15 +68,6 @@ param(
     [Parameter(Mandatory)]
     [string]$BaseDN,
 
-    [Parameter(Mandatory)]
-    [string]$BindDN,
-
-    [Parameter(Mandatory)]
-    [securestring]$Password = $(Read-Host -Prompt "Mot de passe LDAP" -AsSecureString),
-
-    [Parameter(Mandatory)]
-    [string[]]$AppIds,
-
     [string]$AppObjectClass = "groupOfUniqueNames",
     [string]$RoleObjectClass = "groupOfUniqueNames",
 
@@ -84,14 +75,116 @@ param(
 )
 
 Add-Type -AssemblyName System.DirectoryServices.Protocols
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
-$bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
-# PtrToStringBSTR (pas PtrToStringAuto) : ce dernier lit mal le préfixe de longueur du BSTR
-# sur .NET/Linux et tronque silencieusement le mot de passe (vérifié : "password" -> "p").
-$plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+###############################################################
+# POPUP 1 — LOGIN
+###############################################################
+
+$loginForm = New-Object System.Windows.Forms.Form
+$loginForm.Text = "LDAP App/Role Audit — Authentification"
+$loginForm.Size = New-Object System.Drawing.Size(420, 200)
+$loginForm.StartPosition = "CenterScreen"
+
+$lblUser = New-Object System.Windows.Forms.Label
+$lblUser.Text = "Identifiant (DN) :"
+$lblUser.Location = New-Object System.Drawing.Point(10, 20)
+$lblUser.AutoSize = $true
+$loginForm.Controls.Add($lblUser)
+
+$txtUser = New-Object System.Windows.Forms.TextBox
+$txtUser.Location = New-Object System.Drawing.Point(150, 20)
+$txtUser.Width = 240
+$loginForm.Controls.Add($txtUser)
+
+$lblPwd = New-Object System.Windows.Forms.Label
+$lblPwd.Text = "Mot de passe :"
+$lblPwd.Location = New-Object System.Drawing.Point(10, 60)
+$lblPwd.AutoSize = $true
+$loginForm.Controls.Add($lblPwd)
+
+$txtPwd = New-Object System.Windows.Forms.TextBox
+$txtPwd.Location = New-Object System.Drawing.Point(150, 60)
+$txtPwd.Width = 240
+$txtPwd.UseSystemPasswordChar = $true
+$loginForm.Controls.Add($txtPwd)
+
+$btnLogin = New-Object System.Windows.Forms.Button
+$btnLogin.Text = "Connexion"
+$btnLogin.Location = New-Object System.Drawing.Point(150, 110)
+$btnLogin.Add_Click({
+    $loginForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $loginForm.Close()
+})
+$loginForm.Controls.Add($btnLogin)
+$loginForm.AcceptButton = $btnLogin
+
+if ($loginForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    exit
+}
+
+$BindDN = $txtUser.Text.Trim()
+$plainPassword = $txtPwd.Text
+
+if (-not $BindDN) {
+    Write-Host "Identifiant manquant." -ForegroundColor Red
+    exit
+}
+if (-not $plainPassword) {
+    Write-Host "Mot de passe manquant." -ForegroundColor Red
+    exit
+}
+
+###############################################################
+# POPUP 2 — SÉLECTION DES APPLICATIONS
+###############################################################
+
+$appForm = New-Object System.Windows.Forms.Form
+$appForm.Text = "LDAP App/Role Audit — Applications à interroger"
+$appForm.Size = New-Object System.Drawing.Size(500, 350)
+$appForm.StartPosition = "CenterScreen"
+
+$lblApp = New-Object System.Windows.Forms.Label
+$lblApp.Text = "Saisir un ou plusieurs identifiants d'application (1 par ligne) :"
+$lblApp.Location = New-Object System.Drawing.Point(10, 10)
+$lblApp.AutoSize = $true
+$appForm.Controls.Add($lblApp)
+
+$txtApp = New-Object System.Windows.Forms.TextBox
+$txtApp.Multiline = $true
+$txtApp.ScrollBars = "Vertical"
+$txtApp.Location = New-Object System.Drawing.Point(10, 40)
+$txtApp.Size = New-Object System.Drawing.Size(460, 220)
+$appForm.Controls.Add($txtApp)
+
+$btnApp = New-Object System.Windows.Forms.Button
+$btnApp.Text = "Valider"
+$btnApp.Location = New-Object System.Drawing.Point(200, 270)
+$btnApp.Add_Click({
+    $appForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $appForm.Close()
+})
+$appForm.Controls.Add($btnApp)
+$appForm.AcceptButton = $btnApp
+
+if ($appForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    exit
+}
+
+$AppIds = $txtApp.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+if ($AppIds.Count -eq 0) {
+    Write-Host "Aucune application saisie." -ForegroundColor Red
+    exit
+}
+
+###############################################################
+# CONNEXION LDAP
+###############################################################
 
 $credential = New-Object System.Net.NetworkCredential($BindDN, $plainPassword)
+Remove-Variable plainPassword
 
 $ldapConnection = New-Object System.DirectoryServices.Protocols.LdapConnection(
     (New-Object System.DirectoryServices.Protocols.LdapDirectoryIdentifier($LdapServer, $Port))
@@ -106,7 +199,8 @@ if ($UseTls) {
 try {
     # Passer $credential explicitement à Bind() plutôt que de compter uniquement sur la
     # propriété .Credential — sur l'implémentation .NET/Linux (native OpenLDAP), Bind() sans
-    # argument ne reprend pas toujours fiablement le credential déjà assigné.
+    # argument ne reprend pas toujours fiablement le credential déjà assigné. Gardé ici même si
+    # ce script cible Windows, pour rester cohérent avec la version testée du code.
     $ldapConnection.Bind($credential)
 }
 catch {
@@ -114,13 +208,14 @@ catch {
     Write-Host "DN utilisé : [$BindDN]" -ForegroundColor Yellow
     exit 1
 }
-finally {
-    Remove-Variable plainPassword -ErrorAction SilentlyContinue
-}
 
 Write-Host "Connecté à $LdapServer`:$Port (TLS: $UseTls)" -ForegroundColor Green
 
-# --- Filtre : une "application" = un groupe dont le cn correspond à un des AppIds fournis ---
+###############################################################
+# RECHERCHE APPLICATIONS
+###############################################################
+
+# --- Filtre : une "application" = un groupe dont le cn correspond à un des AppIds saisis ---
 $appFilterParts = ($AppIds | ForEach-Object { "(cn=$_)" }) -join ""
 $applicationSearchFilter = "(&(objectClass=$AppObjectClass)(|$appFilterParts))"
 
