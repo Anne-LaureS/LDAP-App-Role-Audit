@@ -11,6 +11,10 @@ qui a accès à quoi, via quel rôle. Authentification et sélection des applica
 
 ⚠️ **Windows uniquement** (popups `System.Windows.Forms`).
 
+Testé en deux temps : d'abord un premier passage rapide contre un serveur LDAP public (démo en
+lecture seule), puis validé de bout en bout contre un vrai Active Directory sur un lab Windows
+Server 2022 — voir les sections dédiées plus bas.
+
 ## ⚙️ Ce que ça fait
 
 1. **Popup 1** : identifiant (DN) + mot de passe → authentification LDAP (LDAPS par défaut)
@@ -22,8 +26,8 @@ qui a accès à quoi, via quel rôle. Authentification et sélection des applica
 
 Schéma utilisé par défaut : `groupOfUniqueNames`/`uniqueMember` (RFC 2256, standard OpenLDAP),
 pas un schéma propriétaire — `-AppObjectClass`/`-RoleObjectClass`/`-MemberAttribute`/
-`-AppNameAttribute` permettent d'adapter aux classes et attributs réels de votre annuaire
-(voir la section Active Directory ci-dessous pour un exemple concret).
+`-AppNameAttribute` permettent d'adapter aux classes et attributs réels de votre annuaire (voir
+Active Directory ci-dessous pour un exemple concret).
 
 ## ▶️ Utilisation
 
@@ -33,42 +37,13 @@ pas un schéma propriétaire — `-AppObjectClass`/`-RoleObjectClass`/`-MemberAt
 
 Les 2 popups s'ouvrent ensuite pour l'authentification et la sélection des applications.
 
-### Démo testable contre un serveur public
+## 🧪 Validation : lab Active Directory (Windows Server 2022)
 
-```powershell
-.\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
-```
-
-Identifiants à saisir dans les popups (serveur de démo public en lecture seule, voir
-[forumsys.com](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)) :
-
-| Popup | Champ | Valeur |
-|---|---|---|
-| 1 — Login | Identifiant (DN) | `cn=read-only-admin,dc=example,dc=com` |
-| 1 — Login | Mot de passe | `password` |
-| 2 — Applications | (une par ligne) | `scientists`, `mathematicians`, `chemists` |
-
-### Exemple de sortie
-
-[`LDAP_Applications_Roles_Audit.csv`](LDAP_Applications_Roles_Audit.csv) — export réel obtenu contre le serveur de démo
-ci-dessus :
-
-| Application | AppDescription | Role | RoleDescription | MemberCount | Members |
-|---|---|---|---|---|---|
-| Chemists | | | | 4 | curie; boyle; nobel; pasteur |
-| Mathematicians | | | | 5 | euclid; riemann; euler; gauss; test |
-| Scientists | | | | 4 | einstein; tesla; newton; galileo |
-| Scientists | | Italians | | 1 | tesla |
-
-Une ligne `Role` vide = accès direct à l'application elle-même (pas via un rôle spécifique).
-`Scientists` a 2 lignes : 4 membres directs, et en plus `tesla` qui a aussi le rôle `Italians`.
-
-- `MemberCount` = nombre de membres (`-MemberAttribute`, `uniqueMember` par défaut) de cette
-  application/rôle dans l'annuaire.
-- `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
-  → `curie`) — pas de recherche LDAP supplémentaire par membre, juste le RDN.
-
-### Contre Active Directory
+Scénario principal de test de ce script — un vrai contrôleur de domaine (VM Windows Server 2022,
+`DC1`, domaine `society.local`, réseau isolé host-only/NAT, pas d'exposition externe), avec 8
+applications et 18 utilisateurs de test, comptes cumulant plusieurs rôles/applications pour
+vérifier la détection des recoupements d'accès — le genre de sur-privilège qu'un audit IAM doit
+faire remonter.
 
 AD utilise un schéma différent de `groupOfUniqueNames` : les groupes de sécurité portent leurs
 membres dans `member` (pas `uniqueMember`), et une OU n'a pas d'attribut `cn` (son nom est dans
@@ -89,17 +64,11 @@ sous-rôles à interroger) :
     -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member"
 ```
 
-#### Lab de test : contrôleur de domaine Windows Server 2022
-
-Validé de bout en bout contre un vrai contrôleur de domaine (VM Windows Server 2022, `DC1`,
-domaine `society.local`, réseau isolé host-only/NAT — pas d'exposition externe) : 8 applications
-(mélange des deux schémas ci-dessus, dont une sans aucun membre) et 18 utilisateurs de test, avec
-des comptes cumulant plusieurs rôles/applications pour vérifier la détection des recoupements
-d'accès — le genre de sur-privilège qu'un audit IAM doit faire remonter.
-
 Ce DC de lab n'ayant pas de certificat LDAPS configuré, le test réel a été fait avec
 `-Port 389 -UseTls:$false` — acceptable ici (réseau isolé, comptes de test jetables), mais à ne
 jamais faire contre un annuaire de production (voir Sécurité ci-dessous).
+
+### Résultats réels
 
 [`Audit_Applications_Groupes.csv`](Audit_Applications_Groupes.csv) — applications modélisées en
 groupes (accès direct) :
@@ -132,6 +101,42 @@ groupes-rôles imbriqués :
 `lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `hlemoine`
 cumule Comptabilite (accès direct) et Admin ERP — exactement le type de recoupement qu'un audit
 d'accès applicatif doit détecter.
+
+## 🌐 Démo rapide sans annuaire à soi
+
+Pas d'AD/LDAP sous la main pour essayer le script ? Un serveur de démo public (lecture seule)
+permet de le tester en 30 secondes :
+
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
+```
+
+Identifiants à saisir dans les popups (voir
+[forumsys.com](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)) :
+
+| Popup | Champ | Valeur |
+|---|---|---|
+| 1 — Login | Identifiant (DN) | `cn=read-only-admin,dc=example,dc=com` |
+| 1 — Login | Mot de passe | `password` |
+| 2 — Applications | (une par ligne) | `scientists`, `mathematicians`, `chemists` |
+
+[`LDAP_Applications_Roles_Audit.csv`](LDAP_Applications_Roles_Audit.csv) — export réel obtenu
+contre ce serveur :
+
+| Application | AppDescription | Role | RoleDescription | MemberCount | Members |
+|---|---|---|---|---|---|
+| Chemists | | | | 4 | curie; boyle; nobel; pasteur |
+| Mathematicians | | | | 5 | euclid; riemann; euler; gauss; test |
+| Scientists | | | | 4 | einstein; tesla; newton; galileo |
+| Scientists | | Italians | | 1 | tesla |
+
+Une ligne `Role` vide = accès direct à l'application elle-même (pas via un rôle spécifique).
+`Scientists` a 2 lignes : 4 membres directs, et en plus `tesla` qui a aussi le rôle `Italians`.
+
+- `MemberCount` = nombre de membres (`-MemberAttribute`, `uniqueMember` par défaut) de cette
+  application/rôle dans l'annuaire.
+- `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
+  → `curie`) — pas de recherche LDAP supplémentaire par membre, juste le RDN.
 
 ## 🔐 Sécurité
 
@@ -167,5 +172,5 @@ d'accès applicatif doit détecter.
   `Scientists` a 4 membres directs, en plus du rôle `Italians` porté par 1 d'entre eux) — s'en
   tenir uniquement aux rôles sous-estime silencieusement les accès réels.
 
-La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre
-le serveur public ci-dessus, puis contre un vrai Active Directory (voir section dédiée ci-dessus).
+La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre un
+vrai Active Directory (voir section dédiée ci-dessus), et contre le serveur de démo public.
