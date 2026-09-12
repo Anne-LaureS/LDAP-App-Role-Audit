@@ -9,7 +9,7 @@ Application / Rôle / Description — utile pour un audit d'accès applicatifs (
 qui a accès à quoi, via quel rôle. Authentification et sélection des applications via
 2 popups Windows Forms.
 
-⚠️ **Windows uniquement** — `System.Windows.Forms` (les 2 popups) n'existe pas sous Linux/macOS.
+⚠️ **Windows uniquement** (popups `System.Windows.Forms`).
 
 ## ⚙️ Ce que ça fait
 
