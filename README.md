@@ -77,7 +77,7 @@ AD :
 
 **Application = un groupe, avec des membres directs (pas de rôle) :**
 ```powershell
-.\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.exemple.local" -BaseDN "OU=Applications,DC=exemple,DC=local" `
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -BaseDN "OU=Applications,DC=society,DC=local" `
     -AppObjectClass "group" -RoleObjectClass "group" -MemberAttribute "member"
 ```
 
@@ -85,17 +85,21 @@ AD :
 enfants dans AD, seule une OU le peut — donc ce schéma s'impose dès qu'une application a des
 sous-rôles à interroger) :
 ```powershell
-.\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.exemple.local" -BaseDN "OU=Applications,DC=exemple,DC=local" `
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -BaseDN "OU=Applications,DC=society,DC=local" `
     -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member"
 ```
 
 #### Lab de test : contrôleur de domaine Windows Server 2022
 
-Validé de bout en bout contre un vrai contrôleur de domaine (VM Windows Server 2022, domaine
-`society.local`) : 8 applications (mélange des deux schémas ci-dessus, dont une sans aucun
-membre) et 18 utilisateurs de test, avec des comptes cumulant plusieurs rôles/applications pour
-vérifier la détection des recoupements d'accès — le genre de sur-privilège qu'un audit IAM doit
-faire remonter.
+Validé de bout en bout contre un vrai contrôleur de domaine (VM Windows Server 2022, `DC1`,
+domaine `society.local`, réseau isolé host-only/NAT — pas d'exposition externe) : 8 applications
+(mélange des deux schémas ci-dessus, dont une sans aucun membre) et 18 utilisateurs de test, avec
+des comptes cumulant plusieurs rôles/applications pour vérifier la détection des recoupements
+d'accès — le genre de sur-privilège qu'un audit IAM doit faire remonter.
+
+Ce DC de lab n'ayant pas de certificat LDAPS configuré, le test réel a été fait avec
+`-Port 389 -UseTls:$false` — acceptable ici (réseau isolé, comptes de test jetables), mais à ne
+jamais faire contre un annuaire de production (voir Sécurité ci-dessous).
 
 [`Audit_Applications_Groupes.csv`](Audit_Applications_Groupes.csv) — applications modélisées en
 groupes (accès direct) :
