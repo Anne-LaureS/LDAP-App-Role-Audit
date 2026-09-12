@@ -150,10 +150,6 @@ Une ligne `Role` vide = accès direct à l'application elle-même (pas via un r�
 
 ## ⚠️ Précautions si vous adaptez ce script
 
-- **Conversion `SecureString` → texte clair** (si vous repassez par un paramètre au lieu du
-  popup) : utiliser `Marshal.PtrToStringBSTR`, pas `PtrToStringAuto` — ce dernier lit mal le
-  préfixe de longueur du BSTR sur .NET/Linux et tronque silencieusement le mot de passe
-  (`"password"` devient `"p"`, sans erreur visible).
 - **Listes d'attributs LDAP à retourner** : typer le tableau explicitement
   (`[string[]]$attrs = @("cn", "description")`) avant de l'utiliser comme paramètre `params
   string[]` d'un constructeur .NET (ex: `SearchRequest`). Un littéral `@(...)` passé
@@ -165,12 +161,6 @@ Une ligne `Role` vide = accès direct à l'application elle-même (pas via un r�
   représentation décimale espacée (des chiffres) au lieu du texte attendu — sans erreur, juste
   un résultat silencieusement faux. Décoder explicitement en UTF-8 quand `$_ -is [byte[]]`
   (voir `Get-MemberNames` dans le script).
-- **Accès direct à une application vs accès via un rôle** : quand une application a des
-  sous-rôles, ne pas se limiter à eux — ses membres directs (`uniqueMember` sur l'entrée de
-  l'application elle-même) sont un accès distinct, à exporter en plus, pas à la place. Une
-  application avec des rôles peut très bien avoir aussi des membres directs (vérifié :
-  `Scientists` a 4 membres directs, en plus du rôle `Italians` porté par 1 d'entre eux) — s'en
-  tenir uniquement aux rôles sous-estime silencieusement les accès réels.
 
 La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre un
 vrai Active Directory (voir section dédiée ci-dessus), et contre le serveur de démo public.
