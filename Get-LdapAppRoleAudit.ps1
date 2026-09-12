@@ -50,10 +50,13 @@
     en clair sur le réseau — quiconque peut sniffer le trafic (switch compromis, ARP spoofing,
     proxy intermédiaire) récupère des identifiants valides. LDAPS (636) ou StartTLS chiffrent la
     session avant l'envoi des identifiants. Ce script utilise LDAPS par défaut ; -UseTls:$false
-    n'existe que pour permettre de tester contre le serveur public ldap.forumsys.com, qui est un
-    service de démo ancien ne supportant plus aucune variante de TLS actuelle (vérifié : ni LDAPS
-    ni StartTLS n'aboutissent contre ce serveur au moment de l'écriture) — ce n'est PAS le
-    comportement à reproduire contre un annuaire réel.
+    n'existe que pour permettre de tester contre le serveur public ldap.forumsys.com, dont le
+    certificat LDAPS (CN=ldap, O=TurnKey OpenLDAP, auto-signé) est expiré depuis le 19/02/2015 et
+    ne correspond pas au nom d'hôte — la négociation TLS elle-même aboutit (vérifié : TLS 1.1
+    accepté), mais LdapConnection.Bind() sous Windows refuse ce certificat invalide et échoue.
+    Ce n'est donc pas une absence de support TLS côté serveur, mais un certificat de démo mort —
+    -UseTls:$false n'est PAS le comportement à reproduire contre un annuaire réel dont le
+    certificat est valide.
 #>
 
 [CmdletBinding()]
