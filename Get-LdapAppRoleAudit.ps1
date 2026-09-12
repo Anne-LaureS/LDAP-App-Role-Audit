@@ -67,12 +67,16 @@
 
 .NOTES
     NOTE SÉCURITÉ — pourquoi LDAPS par défaut :
-    Un bind LDAP simple (Basic) sur port 389 sans TLS transmet l'identifiant ET le mot de passe
-    en clair sur le réseau — quiconque peut sniffer le trafic (switch compromis, ARP spoofing,
-    proxy intermédiaire) récupère des identifiants valides. LDAPS (636) ou StartTLS chiffrent la
-    session avant l'envoi des identifiants. Ce script utilise LDAPS par défaut ; -UseTls:$false
-    n'existe que pour permettre de tester contre le serveur de démo public ldap.forumsys.com (son
-    certificat LDAPS est invalide) — ne jamais désactiver TLS contre un annuaire de production.
+    L'identifiant saisi au popup 1 détermine le mode d'authentification (voir plus bas) : au
+    format "DOMAINE\utilisateur", Negotiate (NTLM/Kerberos) protège le mot de passe par
+    challenge-response même sans TLS ; au format DN/UPN, bind simple (Basic) — le mot de passe
+    part alors en clair sur le réseau sans TLS, interceptable par quiconque peut sniffer le
+    trafic (switch compromis, ARP spoofing, proxy intermédiaire). Dans tous les cas, sans TLS le
+    reste de la session (requêtes, résultats — ici des données d'accès applicatifs) circule aussi
+    en clair. LDAPS (636) ou StartTLS chiffrent toute la session. Ce script utilise LDAPS par
+    défaut ; -UseTls:$false n'existe que pour tester contre le serveur de démo public
+    ldap.forumsys.com (son certificat LDAPS est invalide) — ne jamais désactiver TLS contre un
+    annuaire de production.
 #>
 
 [CmdletBinding()]
@@ -92,7 +96,7 @@ param(
     [string]$MemberAttribute = "uniqueMember",
     [string]$AppNameAttribute = "cn",
 
-    [string]$OutputCsv = "LDAP_Applications_Roles_Audit.csv"
+    [string]$OutputCsv = (Join-Path $PSScriptRoot "LDAP_Applications_Roles_Audit.csv")
 )
 
 Add-Type -AssemblyName System.DirectoryServices.Protocols
@@ -229,14 +233,24 @@ if ($AppIds.Count -eq 0) {
 # CONNEXION LDAP
 ###############################################################
 
-$credential = New-Object System.Net.NetworkCredential($BindDN, $plainPassword)
+# Format NetBIOS "DOMAINE\utilisateur" (ex: SOCIETY\Administrateur) : impossible en bind simple
+# contre Active Directory (non supporté), il faut Negotiate (NTLM/Kerberos) et un Domain séparé.
+# DN complet ou UPN (ex: cn=...,dc=... comme sur forumsys.com, ou user@domaine) : bind simple,
+# compatible AD ET OpenLDAP.
+if ($BindDN -match '^([^\\]+)\\(.+)$') {
+    $credential = New-Object System.Net.NetworkCredential($matches[2], $plainPassword, $matches[1])
+    $authType = [System.DirectoryServices.Protocols.AuthType]::Negotiate
+} else {
+    $credential = New-Object System.Net.NetworkCredential($BindDN, $plainPassword)
+    $authType = [System.DirectoryServices.Protocols.AuthType]::Basic
+}
 Remove-Variable plainPassword
 
 $ldapConnection = New-Object System.DirectoryServices.Protocols.LdapConnection(
     (New-Object System.DirectoryServices.Protocols.LdapDirectoryIdentifier($LdapServer, $Port))
 )
 $ldapConnection.Credential = $credential
-$ldapConnection.AuthType = [System.DirectoryServices.Protocols.AuthType]::Basic
+$ldapConnection.AuthType = $authType
 $ldapConnection.SessionOptions.ProtocolVersion = 3
 if ($UseTls) {
     $ldapConnection.SessionOptions.SecureSocketLayer = $true

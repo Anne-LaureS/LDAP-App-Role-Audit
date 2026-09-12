@@ -1,0 +1,4 @@
+"Application","AppDescription","Role","RoleDescription","MemberCount","Members"
+"CRM","Application CRM","","","0",""
+"CRM","Application CRM","CRM-Admin","Role Admin CRM","1","lrousseau"
+"CRM","Application CRM","CRM-Lecture","Role Lecture seule CRM","2","tnoel; lrousseau"
