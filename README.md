@@ -89,10 +89,45 @@ sous-rôles à interroger) :
     -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member"
 ```
 
-Validé de bout en bout contre un vrai contrôleur de domaine (Windows Server 2022) : 8
-applications (mélange des deux schémas ci-dessus, dont une sans aucun membre) et 18 utilisateurs
-de test, avec des comptes cumulant plusieurs rôles/applications pour vérifier la détection des
-recoupements d'accès.
+#### Lab de test : contrôleur de domaine Windows Server 2022
+
+Validé de bout en bout contre un vrai contrôleur de domaine (VM Windows Server 2022, domaine
+`society.local`) : 8 applications (mélange des deux schémas ci-dessus, dont une sans aucun
+membre) et 18 utilisateurs de test, avec des comptes cumulant plusieurs rôles/applications pour
+vérifier la détection des recoupements d'accès — le genre de sur-privilège qu'un audit IAM doit
+faire remonter.
+
+[`Audit_Applications_Groupes.csv`](Audit_Applications_Groupes.csv) — applications modélisées en
+groupes (accès direct) :
+
+| Application | Role | MemberCount | Members |
+|---|---|---|---|
+| Comptabilite | | 5 | hlemoine; agarcia; pbernard; mmartin; jdupont |
+| RH | | 3 | rmoreau; kdiallo; sfontaine |
+| Juridique | | 2 | cbenali; vlefevre |
+| Marketing | | 4 | ymichel; opetit; nleroy; tgirard |
+| Support-N3 | | 0 | |
+
+[`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) — applications modélisées en OU avec
+groupes-rôles imbriqués :
+
+| Application | Role | MemberCount | Members |
+|---|---|---|---|
+| CRM | | 0 | |
+| CRM | CRM-Admin | 1 | lrousseau |
+| CRM | CRM-Lecture | 2 | tnoel; lrousseau |
+| CRM | CRM-Support | 2 | fandre; wroux |
+| ERP | | 0 | |
+| ERP | ERP-Admin | 1 | hlemoine |
+| ERP | ERP-Support | 1 | tnoel |
+| ERP | ERP-Utilisateur | 4 | rmoreau; kdiallo; sfontaine; jdupont |
+| SIRH | | 0 | |
+| SIRH | SIRH-Admin | 1 | lrousseau |
+| SIRH | SIRH-Lecture | 3 | agarcia; pbernard; mmartin |
+
+`lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `hlemoine`
+cumule Comptabilite (accès direct) et Admin ERP — exactement le type de recoupement qu'un audit
+d'accès applicatif doit détecter.
 
 ## 🔐 Sécurité
 
