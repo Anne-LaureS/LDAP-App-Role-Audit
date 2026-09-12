@@ -16,7 +16,7 @@
     propriétaire — à adapter aux object classes/attributs réels de votre annuaire (ex:
     remplacer -AppObjectClass par la classe applicative de votre organisation).
 
-    ⚠️ Windows uniquement (popups System.Windows.Forms) — PowerShell 5.1 ou 7+.
+    Popups System.Windows.Forms — PowerShell 5.1 ou 7+.
 
 .PARAMETER LdapServer
     Nom d'hôte du serveur LDAP.

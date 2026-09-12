@@ -2,14 +2,11 @@
 
 ![PowerShell](https://img.shields.io/badge/PowerShell-5391FE?style=for-the-badge&logo=powershell&logoColor=white)
 ![LDAP](https://img.shields.io/badge/LDAP-IAM%20Audit-0d1117?style=for-the-badge)
-![Windows](https://img.shields.io/badge/Windows%20only-0078D6?style=for-the-badge&logo=windows&logoColor=white)
 
 Script PowerShell interrogeant un annuaire LDAP pour produire un export CSV
 Application / Rôle / Description — utile pour un audit d'accès applicatifs (IAM/GRC) :
 qui a accès à quoi, via quel rôle. Authentification et sélection des applications via
-2 popups Windows Forms.
-
-⚠️ **Windows uniquement** (popups `System.Windows.Forms`).
+2 popups Windows Forms (`System.Windows.Forms`).
 
 Testé en deux temps : d'abord un premier passage rapide contre un serveur LDAP public (démo en
 lecture seule), puis validé de bout en bout contre un vrai Active Directory sur un lab Windows
@@ -41,7 +38,7 @@ Les 2 popups s'ouvrent ensuite pour l'authentification et la sélection des appl
 
 Scénario principal de test de ce script — un vrai contrôleur de domaine (VM Windows Server 2022,
 `DC1`, domaine `society.local`, réseau isolé host-only/NAT, pas d'exposition externe), avec 8
-applications et 18 utilisateurs de test, comptes cumulant plusieurs rôles/applications pour
+applications et 21 utilisateurs de test, comptes cumulant plusieurs rôles/applications pour
 vérifier la détection des recoupements d'accès — le genre de sur-privilège qu'un audit IAM doit
 faire remonter.
 
@@ -70,22 +67,18 @@ jamais faire contre un annuaire de production (voir Sécurité ci-dessous).
 
 ### Résultats réels
 
-[`Audit_Applications_Groupes.csv`](Audit_Applications_Groupes.csv) — applications modélisées en
-groupes (accès direct) :
+Les 8 applications du lab sont désormais toutes modélisées en OU avec groupes-rôles imbriqués
+(la commande `-AppObjectClass "group"` ci-dessus reste utile pour un AD où une application n'a
+pas de sous-rôles, mais ce n'est plus le cas dans ce lab).
+
+[`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) :
 
 | Application | Role | MemberCount | Members |
 |---|---|---|---|
-| Comptabilite | | 5 | hlemoine; agarcia; pbernard; mmartin; jdupont |
-| RH | | 3 | rmoreau; kdiallo; sfontaine |
-| Juridique | | 2 | cbenali; vlefevre |
-| Marketing | | 4 | ymichel; opetit; nleroy; tgirard |
-| Support-N3 | | 0 | |
-
-[`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) — applications modélisées en OU avec
-groupes-rôles imbriqués :
-
-| Application | Role | MemberCount | Members |
-|---|---|---|---|
+| Comptabilite | | 0 | |
+| Comptabilite | Comptabilite-Admin | 1 | jdupont |
+| Comptabilite | Comptabilite-Consultant | 1 | mmartin |
+| Comptabilite | Comptabilite-Standard | 3 | hlemoine; agarcia; pbernard |
 | CRM | | 0 | |
 | CRM | CRM-Admin | 1 | lrousseau |
 | CRM | CRM-Lecture | 2 | tnoel; lrousseau |
@@ -94,13 +87,26 @@ groupes-rôles imbriqués :
 | ERP | ERP-Admin | 1 | hlemoine |
 | ERP | ERP-Support | 1 | tnoel |
 | ERP | ERP-Utilisateur | 4 | rmoreau; kdiallo; sfontaine; jdupont |
+| Juridique | | 0 | |
+| Juridique | Juridique-Admin | 1 | cbenali |
+| Juridique | Juridique-Standard | 1 | vlefevre |
+| Marketing | | 0 | |
+| Marketing | Marketing-Consultant | 1 | tgirard |
+| Marketing | Marketing-Owner | 1 | ymichel |
+| Marketing | Marketing-Standard | 2 | opetit; nleroy |
+| RH | | 0 | |
+| RH | RH-Admin | 1 | rmoreau |
+| RH | RH-Standard | 2 | kdiallo; sfontaine |
 | SIRH | | 0 | |
 | SIRH | SIRH-Admin | 1 | lrousseau |
 | SIRH | SIRH-Lecture | 3 | agarcia; pbernard; mmartin |
+| Support-N3 | | 0 | |
+| Support-N3 | Support-N3-Admin | 1 | Bertrand Caron |
+| Support-N3 | Support-N3-Standard | 2 | Julien Roche; Nadia Faure |
 
-`lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `hlemoine`
-cumule Comptabilite (accès direct) et Admin ERP — exactement le type de recoupement qu'un audit
-d'accès applicatif doit détecter.
+`lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `jdupont`
+cumule Comptabilite-Admin et ERP-Utilisateur, `hlemoine` cumule Comptabilite-Standard et
+ERP-Admin — exactement le type de recoupement qu'un audit d'accès applicatif doit détecter.
 
 ## 🌐 Démo rapide sans annuaire à soi
 
