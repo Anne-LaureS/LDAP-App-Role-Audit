@@ -161,6 +161,3 @@ Une ligne `Role` vide = accès direct à l'application elle-même (pas via un r�
   représentation décimale espacée (des chiffres) au lieu du texte attendu — sans erreur, juste
   un résultat silencieusement faux. Décoder explicitement en UTF-8 quand `$_ -is [byte[]]`
   (voir `Get-MemberNames` dans le script).
-
-La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre un
-vrai Active Directory (voir section dédiée ci-dessus), et contre le serveur de démo public.
