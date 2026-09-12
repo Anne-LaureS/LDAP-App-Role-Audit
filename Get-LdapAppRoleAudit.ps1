@@ -35,6 +35,18 @@
 .PARAMETER AppObjectClass
     objectClass identifiant une "application" dans votre annuaire. `groupOfUniqueNames` par
     défaut (générique) — à remplacer par la classe propre à votre organisation le cas échéant.
+    Contre Active Directory, une "application" modélisée en OU (rôles = groupes à l'intérieur)
+    utilise `organizationalUnit`.
+
+.PARAMETER MemberAttribute
+    Nom de l'attribut multi-valué listant les membres d'une application/d'un rôle.
+    `uniqueMember` par défaut (RFC 2256, `groupOfUniqueNames`). Contre Active Directory, utiliser
+    `member` (attribut des groupes de sécurité AD).
+
+.PARAMETER AppNameAttribute
+    Attribut portant le nom d'une application, utilisé pour le filtre de recherche ET pour la
+    colonne Application du CSV. `cn` par défaut (groupes). À changer en `ou` si -AppObjectClass
+    est `organizationalUnit` : une OU n'a pas d'attribut `cn`, son nom est porté par `ou`.
 
 .EXAMPLE
     # Démo contre le serveur de test public ldap.forumsys.com (lecture seule) — voir
@@ -43,6 +55,16 @@
     #   Mot de passe : password
     # Dans le popup applications, saisir (1 par ligne) : scientists / mathematicians / chemists
     .\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
+
+.EXAMPLE
+    # Contre un vrai Active Directory : application = groupe (membres directs), pas de rôle.
+    .\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.society.local" -BaseDN "OU=Applications,DC=society,DC=local" `
+        -AppObjectClass "group" -RoleObjectClass "group" -MemberAttribute "member"
+
+    # Application = OU contenant des groupes-rôles (organigramme app/rôles) : une OU n'a pas de
+    # cn, d'où -AppNameAttribute "ou".
+    .\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.society.local" -BaseDN "OU=Applications,DC=society,DC=local" `
+        -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member"
 
 .NOTES
     NOTE SÉCURITÉ — pourquoi LDAPS par défaut :
@@ -68,6 +90,8 @@ param(
 
     [string]$AppObjectClass = "groupOfUniqueNames",
     [string]$RoleObjectClass = "groupOfUniqueNames",
+    [string]$MemberAttribute = "uniqueMember",
+    [string]$AppNameAttribute = "cn",
 
     [string]$OutputCsv = "LDAP_Applications_Roles_Audit.csv"
 )
@@ -238,8 +262,8 @@ Write-Host "Connecté à $LdapServer`:$Port (TLS: $UseTls)" -ForegroundColor Gre
 # RECHERCHE APPLICATIONS
 ###############################################################
 
-# --- Filtre : une "application" = un groupe dont le cn correspond à un des AppIds saisis ---
-$appFilterParts = ($AppIds | ForEach-Object { "(cn=$_)" }) -join ""
+# --- Filtre : une "application" = un objet dont AppNameAttribute correspond à un des AppIds saisis ---
+$appFilterParts = ($AppIds | ForEach-Object { "($AppNameAttribute=$_)" }) -join ""
 $applicationSearchFilter = "(&(objectClass=$AppObjectClass)(|$appFilterParts))"
 
 Write-Host "Filtre LDAP applications : $applicationSearchFilter"
@@ -247,7 +271,7 @@ Write-Host "Filtre LDAP applications : $applicationSearchFilter"
 # Tableau typé explicitement AVANT l'appel à New-Object : un littéral @(...) passé directement
 # comme argument d'un paramètre constructeur "params string[]" ne se marshalle pas correctement
 # ici (vérifié : la liste d'attributs demandée est silencieusement ignorée, rien ne revient).
-[string[]]$searchAttributes = @("cn", "description", "uniqueMember")
+[string[]]$searchAttributes = @("cn", $AppNameAttribute, "description", $MemberAttribute) | Select-Object -Unique
 
 $searchRequest = New-Object System.DirectoryServices.Protocols.SearchRequest(
     $BaseDN,
@@ -263,7 +287,7 @@ $resultArray = [System.Collections.ArrayList]::new()
 
 foreach ($appEntry in $searchResponse.Entries) {
 
-    $appName        = $appEntry.Attributes["cn"][0]
+    $appName        = $appEntry.Attributes[$AppNameAttribute][0]
     $appDescription = if ($appEntry.Attributes["description"]) { $appEntry.Attributes["description"][0] } else { "" }
 
     Write-Host "-- Application: $appName ($($appEntry.DistinguishedName))"
@@ -289,8 +313,8 @@ foreach ($appEntry in $searchResponse.Entries) {
         AppDescription  = $appDescription
         Role            = ""
         RoleDescription = ""
-        MemberCount     = if ($appEntry.Attributes["uniqueMember"]) { $appEntry.Attributes["uniqueMember"].Count } else { 0 }
-        Members         = Get-MemberNames -MemberDNs $appEntry.Attributes["uniqueMember"]
+        MemberCount     = if ($appEntry.Attributes[$MemberAttribute]) { $appEntry.Attributes[$MemberAttribute].Count } else { 0 }
+        Members         = Get-MemberNames -MemberDNs $appEntry.Attributes[$MemberAttribute]
     })
 
     foreach ($roleEntry in $roleSearchResponse.Entries) {
@@ -299,8 +323,8 @@ foreach ($appEntry in $searchResponse.Entries) {
             AppDescription  = $appDescription
             Role            = $roleEntry.Attributes["cn"][0]
             RoleDescription = if ($roleEntry.Attributes["description"]) { $roleEntry.Attributes["description"][0] } else { "" }
-            MemberCount     = if ($roleEntry.Attributes["uniqueMember"]) { $roleEntry.Attributes["uniqueMember"].Count } else { 0 }
-            Members         = Get-MemberNames -MemberDNs $roleEntry.Attributes["uniqueMember"]
+            MemberCount     = if ($roleEntry.Attributes[$MemberAttribute]) { $roleEntry.Attributes[$MemberAttribute].Count } else { 0 }
+            Members         = Get-MemberNames -MemberDNs $roleEntry.Attributes[$MemberAttribute]
         })
     }
 }

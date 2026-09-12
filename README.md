@@ -20,8 +20,10 @@ qui a accès à quoi, via quel rôle. Authentification et sélection des applica
 5. Export CSV trié : nom de l'application, sa description, chacun de ses rôles avec sa
    description et son nombre de membres
 
-Schéma utilisé : `groupOfUniqueNames` (RFC 2256, standard), pas un schéma propriétaire —
-`-AppObjectClass`/`-RoleObjectClass` permettent d'adapter aux classes réelles de votre annuaire.
+Schéma utilisé par défaut : `groupOfUniqueNames`/`uniqueMember` (RFC 2256, standard OpenLDAP),
+pas un schéma propriétaire — `-AppObjectClass`/`-RoleObjectClass`/`-MemberAttribute`/
+`-AppNameAttribute` permettent d'adapter aux classes et attributs réels de votre annuaire
+(voir la section Active Directory ci-dessous pour un exemple concret).
 
 ## ▶️ Utilisation
 
@@ -61,9 +63,36 @@ ci-dessus :
 Une ligne `Role` vide = accès direct à l'application elle-même (pas via un rôle spécifique).
 `Scientists` a 2 lignes : 4 membres directs, et en plus `tesla` qui a aussi le rôle `Italians`.
 
-- `MemberCount` = nombre de membres (`uniqueMember`) de cette application/rôle dans l'annuaire.
+- `MemberCount` = nombre de membres (`-MemberAttribute`, `uniqueMember` par défaut) de cette
+  application/rôle dans l'annuaire.
 - `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
   → `curie`) — pas de recherche LDAP supplémentaire par membre, juste le RDN.
+
+### Contre Active Directory
+
+AD utilise un schéma différent de `groupOfUniqueNames` : les groupes de sécurité portent leurs
+membres dans `member` (pas `uniqueMember`), et une OU n'a pas d'attribut `cn` (son nom est dans
+`ou`). Deux façons de modéliser une "application", selon comment elle est structurée dans votre
+AD :
+
+**Application = un groupe, avec des membres directs (pas de rôle) :**
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.exemple.local" -BaseDN "OU=Applications,DC=exemple,DC=local" `
+    -AppObjectClass "group" -RoleObjectClass "group" -MemberAttribute "member"
+```
+
+**Application = une OU contenant des groupes-rôles** (un groupe ne peut pas avoir d'objets
+enfants dans AD, seule une OU le peut — donc ce schéma s'impose dès qu'une application a des
+sous-rôles à interroger) :
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "dc1.exemple.local" -BaseDN "OU=Applications,DC=exemple,DC=local" `
+    -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member"
+```
+
+Validé de bout en bout contre un vrai contrôleur de domaine (Windows Server 2022) : 8
+applications (mélange des deux schémas ci-dessus, dont une sans aucun membre) et 18 utilisateurs
+de test, avec des comptes cumulant plusieurs rôles/applications pour vérifier la détection des
+recoupements d'accès.
 
 ## 🔐 Sécurité
 
@@ -100,4 +129,4 @@ Une ligne `Role` vide = accès direct à l'application elle-même (pas via un r�
   tenir uniquement aux rôles sous-estime silencieusement les accès réels.
 
 La logique de recherche LDAP a été testée de bout en bout (bind, recherche, export CSV) contre
-le serveur public ci-dessus avant publication.
+le serveur public ci-dessus, puis contre un vrai Active Directory (voir section dédiée ci-dessus).
