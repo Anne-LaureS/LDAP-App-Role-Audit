@@ -69,12 +69,9 @@ Une ligne `Role` vide = accès direct à l'application elle-même (pas via un r�
 
 - **LDAPS par défaut** (`-UseTls`, activé par défaut) — un bind simple non chiffré transmet
   l'identifiant et le mot de passe en clair sur le réseau, interceptable par quiconque peut
-  observer le trafic. `-UseTls:$false` n'existe que pour tester contre le serveur public
-  ci-dessus : son certificat LDAPS (`CN=ldap, O=TurnKey OpenLDAP`, auto-signé) est expiré depuis
-  le 19/02/2015 et ne correspond pas au nom d'hôte — le TLS lui-même fonctionne (négociation
-  TLS 1.1 réussie), mais `LdapConnection.Bind()` sous Windows refuse ce certificat invalide,
-  d'où l'échec en LDAPS contre cette démo. Jamais à reproduire (`-UseTls:$false`) contre un
-  annuaire de production dont le certificat est valide.
+  observer le trafic. `-UseTls:$false` n'existe que pour tester contre le serveur de démo public
+  ci-dessus (son certificat LDAPS est invalide) — ne jamais désactiver TLS contre un annuaire de
+  production.
 - **Mot de passe saisi via un champ masqué** (`UseSystemPasswordChar`), jamais en argument de
   ligne de commande en clair.
 
