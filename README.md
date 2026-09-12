@@ -71,44 +71,13 @@ Les 8 applications du lab sont désormais toutes modélisées en OU avec groupes
 (la commande `-AppObjectClass "group"` ci-dessus reste utile pour un AD où une application n'a
 pas de sous-rôles, mais ce n'est plus le cas dans ce lab).
 
-[`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) :
-
-| Application | Role | MemberCount | Members |
-|---|---|---|---|
-| Comptabilite | | 0 | |
-| Comptabilite | Comptabilite-Admin | 1 | jdupont |
-| Comptabilite | Comptabilite-Consultant | 1 | mmartin |
-| Comptabilite | Comptabilite-Standard | 3 | hlemoine; agarcia; pbernard |
-| CRM | | 0 | |
-| CRM | CRM-Admin | 1 | lrousseau |
-| CRM | CRM-Lecture | 2 | tnoel; lrousseau |
-| CRM | CRM-Support | 2 | fandre; wroux |
-| ERP | | 0 | |
-| ERP | ERP-Admin | 1 | hlemoine |
-| ERP | ERP-Support | 1 | tnoel |
-| ERP | ERP-Utilisateur | 4 | rmoreau; kdiallo; sfontaine; jdupont |
-| Juridique | | 0 | |
-| Juridique | Juridique-Admin | 1 | cbenali |
-| Juridique | Juridique-Standard | 1 | vlefevre |
-| Marketing | | 0 | |
-| Marketing | Marketing-Consultant | 1 | tgirard |
-| Marketing | Marketing-Owner | 1 | ymichel |
-| Marketing | Marketing-Standard | 2 | opetit; nleroy |
-| RH | | 0 | |
-| RH | RH-Admin | 1 | rmoreau |
-| RH | RH-Standard | 2 | kdiallo; sfontaine |
-| SIRH | | 0 | |
-| SIRH | SIRH-Admin | 1 | lrousseau |
-| SIRH | SIRH-Lecture | 3 | agarcia; pbernard; mmartin |
-| Support-N3 | | 0 | |
-| Support-N3 | Support-N3-Admin | 1 | Bertrand Caron |
-| Support-N3 | Support-N3-Standard | 2 | Julien Roche; Nadia Faure |
+Voir détail : [`Audit_Applications_OU.csv`](Audit_Applications_OU.csv).
 
 `lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `jdupont`
 cumule Comptabilite-Admin et ERP-Utilisateur, `hlemoine` cumule Comptabilite-Standard et
 ERP-Admin — exactement le type de recoupement qu'un audit d'accès applicatif doit détecter.
 
-## 🌐 Démo rapide sans annuaire à soi
+## 🌐 Démo rapide sur un LDAP public
 
 Pas d'AD/LDAP sous la main pour essayer le script ? Un serveur de démo public (lecture seule)
 permet de le tester en 30 secondes :
