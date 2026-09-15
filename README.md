@@ -21,6 +21,9 @@ consomme justement ce format CSV Application/Rôle/Membres.
 ## ⚙️ Ce que ça fait
 
 1. **Popup 1** : identifiant (DN) + mot de passe → authentification LDAP (LDAPS par défaut)
+
+   ![Popup d'authentification](screenshots/login-popup.png)
+
 2. **Popup 2** : un ou plusieurs identifiants d'application à interroger (1 par ligne)
 3. Recherche des groupes ("applications") correspondant à ces identifiants
 4. Pour chaque application, recherche ses sous-groupes ("rôles")
