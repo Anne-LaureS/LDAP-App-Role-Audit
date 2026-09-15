@@ -1,4 +1,4 @@
-"Application","AppDescription","Role","RoleDescription","MemberCount","Members"
+﻿"Application","AppDescription","Role","RoleDescription","MemberCount","Members"
 "Comptabilite","Application Comptabilite","","","0",""
 "Comptabilite","Application Comptabilite","Comptabilite-Admin","Rôle Administrateur Comptabilite - accès complet","1","jdupont"
 "Comptabilite","Application Comptabilite","Comptabilite-Consultant","Rôle Consultant Comptabilite - accès lecture/support","1","mmartin"

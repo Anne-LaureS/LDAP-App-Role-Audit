@@ -8,9 +8,9 @@ Application / Rôle / Description — utile pour un audit d'accès applicatifs (
 qui a accès à quoi, via quel rôle. Authentification et sélection des applications via
 2 popups Windows Forms (`System.Windows.Forms`).
 
-Testé en deux temps : d'abord un premier passage rapide contre un serveur LDAP public (démo en
-lecture seule), puis validé de bout en bout contre un vrai Active Directory sur un lab Windows
-Server 2022 — voir les sections dédiées plus bas.
+Validé de bout en bout contre un vrai Active Directory sur un lab Windows Server 2022 (voir
+"Validation" plus bas) ; un serveur de démo public existe aussi si vous voulez juste l'essayer
+sans annuaire à disposition.
 
 ## ⚙️ Ce que ça fait
 
@@ -19,7 +19,9 @@ Server 2022 — voir les sections dédiées plus bas.
 3. Recherche des groupes ("applications") correspondant à ces identifiants
 4. Pour chaque application, recherche ses sous-groupes ("rôles")
 5. Export CSV trié : nom de l'application, sa description, chacun de ses rôles avec sa
-   description et son nombre de membres
+   description et son nombre de membres — une ligne `Role` vide = accès direct à l'application
+   elle-même ; `Members` est extrait du DN de chaque membre (ex: `uid=curie,dc=...` → `curie`),
+   pas de recherche LDAP supplémentaire par membre
 
 Schéma utilisé par défaut : `groupOfUniqueNames`/`uniqueMember` (RFC 2256, standard OpenLDAP),
 pas un schéma propriétaire — `-AppObjectClass`/`-RoleObjectClass`/`-MemberAttribute`/
@@ -65,13 +67,43 @@ Ce DC de lab n'ayant pas de certificat LDAPS configuré, le test réel a été f
 `-Port 389 -UseTls:$false` — acceptable ici (réseau isolé, comptes de test jetables), mais à ne
 jamais faire contre un annuaire de production (voir Sécurité ci-dessous).
 
+Commande complète reprise dans [`Test-Lab.ps1`](Test-Lab.ps1) :
+```powershell
+.\Test-Lab.ps1
+```
+
+équivalent à :
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -Port 389 -UseTls:$false -BaseDN "OU=Applications,DC=society,DC=local" -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member" -OutputCsv "LDAP_Applications_Roles_Audit.csv"
+```
+
+| Popup | Champ | Valeur |
+|---|---|---|
+| 1 — Login | Identifiant | `SOCIETY\Administrateur` |
+| 2 — Applications | (une par ligne) | `CRM`, `ERP`, `SIRH`, `Comptabilite`, `RH`, `Juridique`, `Marketing`, `Support-N3` |
+
 ### Résultats réels
 
 Les 8 applications du lab sont désormais toutes modélisées en OU avec groupes-rôles imbriqués
 (la commande `-AppObjectClass "group"` ci-dessus reste utile pour un AD où une application n'a
 pas de sous-rôles, mais ce n'est plus le cas dans ce lab).
 
-Voir détail : [`Audit_Applications_OU.csv`](Audit_Applications_OU.csv).
+Voir détail : [`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) — même commande que
+`Test-Lab.ps1` ci-dessus avec `-OutputCsv "Audit_Applications_OU.csv"`.
+
+Le script sert aussi à un audit ciblé sur une seule application (ex: un app owner qui veut
+juste la revue de la sienne, pas tout l'annuaire) — même commande, `-OutputCsv` différent et un
+seul nom saisi au popup 2 :
+
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -Port 389 -UseTls:$false -BaseDN "OU=Applications,DC=society,DC=local" -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member" -OutputCsv "Audit_CRM.csv"
+```
+Popup applications : `CRM` → [`Audit_CRM.csv`](Audit_CRM.csv)
+
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -Port 389 -UseTls:$false -BaseDN "OU=Applications,DC=society,DC=local" -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member" -OutputCsv "Audit_Comptabilite.csv"
+```
+Popup applications : `Comptabilite` → [`Audit_Comptabilite.csv`](Audit_Comptabilite.csv)
 
 `lrousseau` cumule 3 rôles admin/lecture sur 2 applications distinctes (CRM + SIRH), `jdupont`
 cumule Comptabilite-Admin et ERP-Utilisateur, `hlemoine` cumule Comptabilite-Standard et
@@ -79,15 +111,18 @@ ERP-Admin — exactement le type de recoupement qu'un audit d'accès applicatif 
 
 ## 🌐 Démo rapide sur un LDAP public
 
-Pas d'AD/LDAP sous la main pour essayer le script ? Un serveur de démo public (lecture seule)
-permet de le tester en 30 secondes :
+Pas d'AD/LDAP sous la main ? Le script fonctionne aussi contre le serveur de démo public
+[forumsys](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)
+(lecture seule) :
 
 ```powershell
-.\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com"
+.\Test-ForumsysDemo.ps1
 ```
 
-Identifiants à saisir dans les popups (voir
-[forumsys.com](https://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/)) :
+équivalent à :
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "ldap.forumsys.com" -Port 389 -UseTls:$false -BaseDN "dc=example,dc=com" -OutputCsv "LDAP-App-Role-Audit-ForumSys.csv"
+```
 
 | Popup | Champ | Valeur |
 |---|---|---|
@@ -95,23 +130,7 @@ Identifiants à saisir dans les popups (voir
 | 1 — Login | Mot de passe | `password` |
 | 2 — Applications | (une par ligne) | `scientists`, `mathematicians`, `chemists` |
 
-[`LDAP_Applications_Roles_Audit.csv`](LDAP_Applications_Roles_Audit.csv) — export réel obtenu
-contre ce serveur :
-
-| Application | AppDescription | Role | RoleDescription | MemberCount | Members |
-|---|---|---|---|---|---|
-| Chemists | | | | 4 | curie; boyle; nobel; pasteur |
-| Mathematicians | | | | 5 | euclid; riemann; euler; gauss; test |
-| Scientists | | | | 4 | einstein; tesla; newton; galileo |
-| Scientists | | Italians | | 1 | tesla |
-
-Une ligne `Role` vide = accès direct à l'application elle-même (pas via un rôle spécifique).
-`Scientists` a 2 lignes : 4 membres directs, et en plus `tesla` qui a aussi le rôle `Italians`.
-
-- `MemberCount` = nombre de membres (`-MemberAttribute`, `uniqueMember` par défaut) de cette
-  application/rôle dans l'annuaire.
-- `Members` = qui ils sont, extrait du DN de chaque membre (ex: `uid=curie,dc=example,dc=com`
-  → `curie`) — pas de recherche LDAP supplémentaire par membre, juste le RDN.
+Export obtenu : [`LDAP-App-Role-Audit-ForumSys.csv`](LDAP-App-Role-Audit-ForumSys.csv).
 
 ## 🔐 Sécurité
 
