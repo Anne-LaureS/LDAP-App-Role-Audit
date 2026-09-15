@@ -12,6 +12,12 @@ Validé de bout en bout contre un vrai Active Directory sur un lab Windows Serve
 "Validation" plus bas) ; un serveur de démo public existe aussi si vous voulez juste l'essayer
 sans annuaire à disposition.
 
+Ce script produit la donnée source (qui a accès à quoi) ; la suite logique du pipeline —
+détection des conflits de séparation des tâches (SoD), rôles inutilisés, campagnes de
+recertification et révocations — est traitée dans
+[IAM-Access-Recertification](https://github.com/Anne-LaureS/IAM-Access-Recertification), qui
+consomme justement ce format CSV Application/Rôle/Membres.
+
 ## ⚙️ Ce que ça fait
 
 1. **Popup 1** : identifiant (DN) + mot de passe → authentification LDAP (LDAPS par défaut)
