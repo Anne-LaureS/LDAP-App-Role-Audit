@@ -18,6 +18,11 @@ recertification et révocations — est traitée dans
 [IAM-Access-Recertification](https://github.com/Anne-LaureS/IAM-Access-Recertification), qui
 consomme justement ce format CSV Application/Rôle/Membres.
 
+Ce script audite en lecture seule les comptes/groupes déjà présents dans l'annuaire ; leur
+création, mise à jour et désactivation (Joiner/Mover/Leaver) sont traitées côté écriture par
+[IAM-JML-Lifecycle](https://github.com/Anne-LaureS/IAM-JML-Lifecycle) — le pendant "provisioning"
+de cet outil d'audit.
+
 ## ⚙️ Ce que ça fait
 
 1. **Popup 1** : identifiant (DN) + mot de passe → authentification LDAP (LDAPS par défaut)
