@@ -20,7 +20,7 @@ consomme justement ce format CSV Application/Rôle/Membres.
 
 Ce script audite en lecture seule les comptes/groupes déjà présents dans l'annuaire ; leur
 création, mise à jour et désactivation (Joiner/Mover/Leaver) sont traitées côté écriture par
-[IAM-JML-Lifecycle](https://github.com/Anne-LaureS/IAM-JML-Lifecycle) — le pendant "provisioning"
+[IAM-JML-Lifecycle](https://github.com/Anne-LaureS/IAM-JML-Lifecycle) — le counterpart "provisioning"
 de cet outil d'audit.
 
 ## ⚙️ Ce que ça fait
