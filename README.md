@@ -167,6 +167,8 @@ en ne demandant les identifiants **qu'une seule fois** :
 .\Invoke-LabAudit.ps1
 ```
 
+![Invoke-LabAudit.ps1 : les 4 audits enchaînés, identifiants saisis une seule fois](screenshots/invoke-lab-audit.png)
+
 ## 🌐 Démo rapide sur un LDAP public
 
 Pas d'AD/LDAP sous la main ? Le script fonctionne aussi contre le serveur de démo public
