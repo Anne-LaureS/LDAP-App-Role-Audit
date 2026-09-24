@@ -28,6 +28,14 @@
     apparaît sous son nom de groupe). Désactivé par défaut : sans ce commutateur le comportement
     est strictement inchangé. Spécifique à Active Directory (attribut member) ; ignoré sinon.
 
+.PARAMETER Credential
+    Identifiants du bind (ex: SOCIETY\Administrateur). S'ils sont fournis, la popup 1 (login) n'est
+    pas affichée : permet de lancer l'audit sans interface (script, tâche planifiée).
+
+.PARAMETER AppIds
+    Liste des applications à interroger. Si elle est fournie, la popup 2 n'est pas affichée. Avec
+    -Credential, l'audit devient entièrement non interactif.
+
 .PARAMETER Port
     Port LDAP. 636 (LDAPS) par défaut — voir la note sécurité ci-dessous.
 
@@ -105,7 +113,11 @@ param(
 
     [string]$OutputCsv = (Join-Path $PSScriptRoot "LDAP_Applications_Roles_Audit.csv"),
 
-    [switch]$ResolveNested
+    [switch]$ResolveNested,
+
+    [System.Management.Automation.PSCredential]$Credential,
+
+    [string[]]$AppIds
 )
 
 Add-Type -AssemblyName System.DirectoryServices.Protocols
@@ -159,101 +171,112 @@ function Get-EffectiveMemberNames {
 # POPUP 1 — LOGIN
 ###############################################################
 
-$loginForm = New-Object System.Windows.Forms.Form
-$loginForm.Text = "LDAP App/Role Audit — Authentification"
-$loginForm.Size = New-Object System.Drawing.Size(420, 200)
-$loginForm.StartPosition = "CenterScreen"
-
-$lblUser = New-Object System.Windows.Forms.Label
-$lblUser.Text = "Identifiant (DN) :"
-$lblUser.Location = New-Object System.Drawing.Point(10, 20)
-$lblUser.AutoSize = $true
-$loginForm.Controls.Add($lblUser)
-
-$txtUser = New-Object System.Windows.Forms.TextBox
-$txtUser.Location = New-Object System.Drawing.Point(150, 20)
-$txtUser.Width = 240
-$loginForm.Controls.Add($txtUser)
-
-$lblPwd = New-Object System.Windows.Forms.Label
-$lblPwd.Text = "Mot de passe :"
-$lblPwd.Location = New-Object System.Drawing.Point(10, 60)
-$lblPwd.AutoSize = $true
-$loginForm.Controls.Add($lblPwd)
-
-$txtPwd = New-Object System.Windows.Forms.TextBox
-$txtPwd.Location = New-Object System.Drawing.Point(150, 60)
-$txtPwd.Width = 240
-$txtPwd.UseSystemPasswordChar = $true
-$loginForm.Controls.Add($txtPwd)
-
-$btnLogin = New-Object System.Windows.Forms.Button
-$btnLogin.Text = "Connexion"
-$btnLogin.Location = New-Object System.Drawing.Point(150, 110)
-$btnLogin.Add_Click({
-    $loginForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $loginForm.Close()
-})
-$loginForm.Controls.Add($btnLogin)
-$loginForm.AcceptButton = $btnLogin
-
-if ($loginForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-    exit
+if ($Credential) {
+    $BindDN = $Credential.UserName
+    $plainPassword = $Credential.GetNetworkCredential().Password
 }
+else {
+    $loginForm = New-Object System.Windows.Forms.Form
+    $loginForm.Text = "LDAP App/Role Audit — Authentification"
+    $loginForm.Size = New-Object System.Drawing.Size(420, 200)
+    $loginForm.StartPosition = "CenterScreen"
 
-$BindDN = $txtUser.Text.Trim()
-$plainPassword = $txtPwd.Text
+    $lblUser = New-Object System.Windows.Forms.Label
+    $lblUser.Text = "Identifiant (DN) :"
+    $lblUser.Location = New-Object System.Drawing.Point(10, 20)
+    $lblUser.AutoSize = $true
+    $loginForm.Controls.Add($lblUser)
 
-if (-not $BindDN) {
-    Write-Host "Identifiant manquant." -ForegroundColor Red
-    exit
-}
-if (-not $plainPassword) {
-    Write-Host "Mot de passe manquant." -ForegroundColor Red
-    exit
+    $txtUser = New-Object System.Windows.Forms.TextBox
+    $txtUser.Location = New-Object System.Drawing.Point(150, 20)
+    $txtUser.Width = 240
+    $loginForm.Controls.Add($txtUser)
+
+    $lblPwd = New-Object System.Windows.Forms.Label
+    $lblPwd.Text = "Mot de passe :"
+    $lblPwd.Location = New-Object System.Drawing.Point(10, 60)
+    $lblPwd.AutoSize = $true
+    $loginForm.Controls.Add($lblPwd)
+
+    $txtPwd = New-Object System.Windows.Forms.TextBox
+    $txtPwd.Location = New-Object System.Drawing.Point(150, 60)
+    $txtPwd.Width = 240
+    $txtPwd.UseSystemPasswordChar = $true
+    $loginForm.Controls.Add($txtPwd)
+
+    $btnLogin = New-Object System.Windows.Forms.Button
+    $btnLogin.Text = "Connexion"
+    $btnLogin.Location = New-Object System.Drawing.Point(150, 110)
+    $btnLogin.Add_Click({
+        $loginForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $loginForm.Close()
+    })
+    $loginForm.Controls.Add($btnLogin)
+    $loginForm.AcceptButton = $btnLogin
+
+    if ($loginForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        exit
+    }
+
+    $BindDN = $txtUser.Text.Trim()
+    $plainPassword = $txtPwd.Text
+
+    if (-not $BindDN) {
+        Write-Host "Identifiant manquant." -ForegroundColor Red
+        exit
+    }
+    if (-not $plainPassword) {
+        Write-Host "Mot de passe manquant." -ForegroundColor Red
+        exit
+    }
 }
 
 ###############################################################
 # POPUP 2 — SÉLECTION DES APPLICATIONS
 ###############################################################
 
-$appForm = New-Object System.Windows.Forms.Form
-$appForm.Text = "LDAP App/Role Audit — Applications à interroger"
-$appForm.Size = New-Object System.Drawing.Size(500, 350)
-$appForm.StartPosition = "CenterScreen"
-
-$lblApp = New-Object System.Windows.Forms.Label
-$lblApp.Text = "Saisir un ou plusieurs identifiants d'application (1 par ligne) :"
-$lblApp.Location = New-Object System.Drawing.Point(10, 10)
-$lblApp.AutoSize = $true
-$appForm.Controls.Add($lblApp)
-
-$txtApp = New-Object System.Windows.Forms.TextBox
-$txtApp.Multiline = $true
-$txtApp.ScrollBars = "Vertical"
-$txtApp.Location = New-Object System.Drawing.Point(10, 40)
-$txtApp.Size = New-Object System.Drawing.Size(460, 220)
-$appForm.Controls.Add($txtApp)
-
-$btnApp = New-Object System.Windows.Forms.Button
-$btnApp.Text = "Valider"
-$btnApp.Location = New-Object System.Drawing.Point(200, 270)
-$btnApp.Add_Click({
-    $appForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $appForm.Close()
-})
-$appForm.Controls.Add($btnApp)
-$appForm.AcceptButton = $btnApp
-
-if ($appForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-    exit
+if ($AppIds -and $AppIds.Count -gt 0) {
+    $AppIds = @($AppIds | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
 }
+else {
+    $appForm = New-Object System.Windows.Forms.Form
+    $appForm.Text = "LDAP App/Role Audit — Applications à interroger"
+    $appForm.Size = New-Object System.Drawing.Size(500, 350)
+    $appForm.StartPosition = "CenterScreen"
 
-$AppIds = $txtApp.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+    $lblApp = New-Object System.Windows.Forms.Label
+    $lblApp.Text = "Saisir un ou plusieurs identifiants d'application (1 par ligne) :"
+    $lblApp.Location = New-Object System.Drawing.Point(10, 10)
+    $lblApp.AutoSize = $true
+    $appForm.Controls.Add($lblApp)
 
-if ($AppIds.Count -eq 0) {
-    Write-Host "Aucune application saisie." -ForegroundColor Red
-    exit
+    $txtApp = New-Object System.Windows.Forms.TextBox
+    $txtApp.Multiline = $true
+    $txtApp.ScrollBars = "Vertical"
+    $txtApp.Location = New-Object System.Drawing.Point(10, 40)
+    $txtApp.Size = New-Object System.Drawing.Size(460, 220)
+    $appForm.Controls.Add($txtApp)
+
+    $btnApp = New-Object System.Windows.Forms.Button
+    $btnApp.Text = "Valider"
+    $btnApp.Location = New-Object System.Drawing.Point(200, 270)
+    $btnApp.Add_Click({
+        $appForm.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $appForm.Close()
+    })
+    $appForm.Controls.Add($btnApp)
+    $appForm.AcceptButton = $btnApp
+
+    if ($appForm.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        exit
+    }
+
+    $AppIds = $txtApp.Lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+    if ($AppIds.Count -eq 0) {
+        Write-Host "Aucune application saisie." -ForegroundColor Red
+        exit
+    }
 }
 
 ###############################################################
@@ -265,10 +288,10 @@ if ($AppIds.Count -eq 0) {
 # DN complet ou UPN (ex: cn=...,dc=... comme sur forumsys.com, ou user@domaine) : bind simple,
 # compatible AD ET OpenLDAP.
 if ($BindDN -match '^([^\\]+)\\(.+)$') {
-    $credential = New-Object System.Net.NetworkCredential($matches[2], $plainPassword, $matches[1])
+    $ldapCredential = New-Object System.Net.NetworkCredential($matches[2], $plainPassword, $matches[1])
     $authType = [System.DirectoryServices.Protocols.AuthType]::Negotiate
 } else {
-    $credential = New-Object System.Net.NetworkCredential($BindDN, $plainPassword)
+    $ldapCredential = New-Object System.Net.NetworkCredential($BindDN, $plainPassword)
     $authType = [System.DirectoryServices.Protocols.AuthType]::Basic
 }
 Remove-Variable plainPassword
@@ -276,7 +299,7 @@ Remove-Variable plainPassword
 $ldapConnection = New-Object System.DirectoryServices.Protocols.LdapConnection(
     (New-Object System.DirectoryServices.Protocols.LdapDirectoryIdentifier($LdapServer, $Port))
 )
-$ldapConnection.Credential = $credential
+$ldapConnection.Credential = $ldapCredential
 $ldapConnection.AuthType = $authType
 $ldapConnection.SessionOptions.ProtocolVersion = 3
 if ($UseTls) {
@@ -284,11 +307,11 @@ if ($UseTls) {
 }
 
 try {
-    # Passer $credential explicitement à Bind() plutôt que de compter uniquement sur la
+    # Passer $ldapCredential explicitement à Bind() plutôt que de compter uniquement sur la
     # propriété .Credential — sur l'implémentation .NET/Linux (native OpenLDAP), Bind() sans
     # argument ne reprend pas toujours fiablement le credential déjà assigné. Gardé ici même si
     # ce script cible Windows, pour rester cohérent avec la version testée du code.
-    $ldapConnection.Bind($credential)
+    $ldapConnection.Bind($ldapCredential)
 }
 catch {
     Write-Host "ERREUR LDAP : $($_.Exception.Message)" -ForegroundColor Red

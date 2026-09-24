@@ -149,6 +149,24 @@ Popup applications : `Comptabilite` → [`Audit_Comptabilite.csv`](Audit_Comptab
 cumule Comptabilite-Admin et ERP-Utilisateur, `hlemoine` cumule Comptabilite-Standard et
 ERP-Admin — exactement le type de recoupement qu'un audit d'accès applicatif doit détecter.
 
+### Mode non interactif : `-Credential` et `-AppIds`
+
+Les deux popups ne sont pas adaptées à un audit répété ou planifié. Avec `-Credential` (identifiants
+du bind) et `-AppIds` (liste des applications), le script n'affiche plus aucune fenêtre ; chaque
+paramètre peut aussi être fourni seul pour ne supprimer que la popup correspondante :
+
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -Port 389 -UseTls:$false -BaseDN "OU=Applications,DC=society,DC=local" -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member" -Credential (Get-Credential) -AppIds "CRM","Credit" -OutputCsv "Audit_exemple.csv"
+```
+
+[`Invoke-LabAudit.ps1`](Invoke-LabAudit.ps1) enchaîne ainsi les 4 audits du lab (20 applications en
+membres directs, 20 applications avec `-ResolveNested`, puis les audits ciblés CRM et Comptabilite)
+en ne demandant les identifiants **qu'une seule fois** :
+
+```powershell
+.\Invoke-LabAudit.ps1
+```
+
 ## 🌐 Démo rapide sur un LDAP public
 
 Pas d'AD/LDAP sous la main ? Le script fonctionne aussi contre le serveur de démo public
