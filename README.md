@@ -169,6 +169,32 @@ en ne demandant les identifiants **qu'une seule fois** :
 
 ![Invoke-LabAudit.ps1 : les 4 audits enchaînés, identifiants saisis une seule fois](screenshots/invoke-lab-audit.png)
 
+### Inventaire des comptes : `Get-LdapAccountInventory.ps1`
+
+L'audit des rôles répond à « qui a accès à quoi ». Il ne dit rien sur les comptes eux-mêmes : un
+compte inactif depuis des mois, sans propriétaire ou désactivé peut pourtant garder ses accès.
+[`Get-LdapAccountInventory.ps1`](Get-LdapAccountInventory.ps1) exporte, en **lecture seule**, l'état
+de tous les comptes utilisateur : activé/désactivé, dates de création, de dernière connexion et de
+dernier changement de mot de passe, OU, description, département et nombre de groupes.
+
+```powershell
+.\Get-LdapAccountInventory.ps1
+```
+
+![Inventaire des comptes : 101 comptes exportés](screenshots/inventory-comptes.png)
+
+Le résultat, `Accounts_Inventory.csv` (non publié : il contient des identifiants réels ; un exemple
+anonymisé est dans [IAM-Access-Recertification](https://github.com/Anne-LaureS/IAM-Access-Recertification/blob/main/sample-data/Accounts_Inventory.csv)),
+alimente la détection des comptes
+dormants, orphelins et leavers encore actifs dans
+[IAM-Access-Recertification](https://github.com/Anne-LaureS/IAM-Access-Recertification). Comme
+`Get-LdapAppRoleAudit.ps1`, il n'utilise que du LDAP (pas de module ActiveDirectory), accepte
+`-Credential`, et la pagination le rend utilisable au-delà de 1000 comptes.
+
+⚠️ `lastLogonTimestamp` est répliqué avec un décalage pouvant atteindre environ 14 jours : il ne
+convient qu'à des seuils de plusieurs dizaines de jours (30, 60, 90). Il est vide pour un compte qui ne
+s'est jamais connecté.
+
 ## 🌐 Démo rapide sur un LDAP public
 
 Pas d'AD/LDAP sous la main ? Le script fonctionne aussi contre le serveur de démo public
