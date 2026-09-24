@@ -53,10 +53,12 @@ Les 2 popups s'ouvrent ensuite pour l'authentification et la sélection des appl
 ## 🧪 Validation : lab Active Directory (Windows Server 2022)
 
 Scénario principal de test de ce script — un vrai contrôleur de domaine (VM Windows Server 2022,
-`DC1`, domaine `society.local`, réseau isolé host-only/NAT, pas d'exposition externe), avec 8
-applications et 21 utilisateurs de test, comptes cumulant plusieurs rôles/applications pour
-vérifier la détection des recoupements d'accès — le genre de sur-privilège qu'un audit IAM doit
-faire remonter.
+`DC1`, domaine `society.local`, réseau isolé host-only/NAT, pas d'exposition externe), Le lab
+initial comptait 8 applications et 21 utilisateurs de test, avec des comptes cumulant plusieurs
+rôles/applications pour vérifier la détection des recoupements d'accès — le genre de
+sur-privilège qu'un audit IAM doit faire remonter. Il a ensuite été **enrichi** (20 applications,
+plus de 90 personnes, comptes admin/service/dormants, groupes imbriqués) : voir
+[IAM-JML-Lifecycle](https://github.com/Anne-LaureS/IAM-JML-Lifecycle).
 
 AD utilise un schéma différent de `groupOfUniqueNames` : les groupes de sécurité portent leurs
 membres dans `member` (pas `uniqueMember`), et une OU n'a pas d'attribut `cn` (son nom est dans
@@ -94,16 +96,40 @@ Commande complète reprise dans [`Test-Lab.ps1`](Test-Lab.ps1) :
 | Popup | Champ | Valeur |
 |---|---|---|
 | 1 — Login | Identifiant | `SOCIETY\Administrateur` |
-| 2 — Applications | (une par ligne) | `CRM`, `ERP`, `SIRH`, `Comptabilite`, `RH`, `Juridique`, `Marketing`, `Support-N3` |
+| 2 — Applications | (une par ligne) | `CRM`, `ERP`, `SIRH`, `Comptabilite`, `RH`, `Juridique`, `Marketing`, `Support-N3` (lab initial), puis `CoreBanking`, `Credit`, `KYC-LCBFT`, `Paiements-SEPA`, `Tresorerie-Marches`, `Risques`, `Monetique`, `Achats`, `ITSM`, `SecOps`, `DevOps`, `Helpdesk` (lab enrichi) |
 
 ### Résultats réels
 
-Les 8 applications du lab sont désormais toutes modélisées en OU avec groupes-rôles imbriqués
-(la commande `-AppObjectClass "group"` ci-dessus reste utile pour un AD où une application n'a
-pas de sous-rôles, mais ce n'est plus le cas dans ce lab).
+Les 20 applications du lab sont modélisées en OU avec groupes-rôles (la commande
+`-AppObjectClass "group"` ci-dessus reste utile pour un AD où une application n'a pas de
+sous-rôles, mais ce n'est plus le cas dans ce lab).
 
-Voir détail : [`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) — même commande que
-`Test-Lab.ps1` ci-dessus avec `-OutputCsv "Audit_Applications_OU.csv"`.
+Voir détail : [`Audit_Applications_OU.csv`](Audit_Applications_OU.csv) — 81 lignes (20 applications),
+même commande que `Test-Lab.ps1` ci-dessus avec `-OutputCsv "Audit_Applications_OU.csv"`.
+
+### Accès indirects : `-ResolveNested`
+
+Dans un annuaire d'entreprise, un accès passe souvent par un groupe imbriqué : la personne est dans
+un profil (`G-ROLE-CREDIT-ADMIN`), et le profil est membre du rôle (`Credit-Admin`). Par défaut, le
+script ne lit que les membres **directs** d'un rôle : le groupe apparaît alors sous son nom, et la
+personne derrière reste invisible pour tout outil d'analyse en aval.
+
+Avec `-ResolveNested` (Active Directory uniquement), le script interroge le contrôleur de domaine
+avec la règle de correspondance `LDAP_MATCHING_RULE_IN_CHAIN` et liste les **personnes** qui ont
+réellement l'accès, en direct ou par imbrication :
+
+```powershell
+.\Get-LdapAppRoleAudit.ps1 -LdapServer "DC1.society.local" -Port 389 -UseTls:$false -BaseDN "OU=Applications,DC=society,DC=local" -AppObjectClass "organizationalUnit" -AppNameAttribute "ou" -RoleObjectClass "group" -MemberAttribute "member" -ResolveNested -OutputCsv "Audit_Applications_OU_ResolveNested.csv"
+```
+
+| Rôle | Sans `-ResolveNested` | Avec `-ResolveNested` |
+|---|---|---|
+| `Credit/Credit-Admin` | `G-ROLE-CREDIT-ADMIN` | `Sophie Nguyen (adm-snguyen)` |
+| `CoreBanking/CoreBanking-Admin` | 4 membres, dont `G-ROLE-COREBANKING-ADMIN` | 5 membres : les personnes, dont `Cecile Durand`, ajoutée par erreur à ce profil |
+
+Le commutateur est désactivé par défaut : sans lui, le comportement est strictement inchangé.
+Résultat : [`Audit_Applications_OU_ResolveNested.csv`](Audit_Applications_OU_ResolveNested.csv), qui
+alimente [IAM-Access-Recertification](https://github.com/Anne-LaureS/IAM-Access-Recertification).
 
 Le script sert aussi à un audit ciblé sur une seule application (ex: un app owner qui veut
 juste la revue de la sienne, pas tout l'annuaire) — même commande, `-OutputCsv` différent et un

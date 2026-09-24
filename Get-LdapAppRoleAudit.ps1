@@ -21,6 +21,13 @@
 .PARAMETER LdapServer
     Nom d'hôte du serveur LDAP.
 
+.PARAMETER ResolveNested
+    Résout les groupes imbriqués : pour chaque rôle, liste les PERSONNES qui y accèdent, en
+    direct ou via des groupes imbriqués (règle de correspondance AD LDAP_MATCHING_RULE_IN_CHAIN,
+    OID 1.2.840.113556.1.4.1941), au lieu des seuls membres directs (où un groupe imbriqué
+    apparaît sous son nom de groupe). Désactivé par défaut : sans ce commutateur le comportement
+    est strictement inchangé. Spécifique à Active Directory (attribut member) ; ignoré sinon.
+
 .PARAMETER Port
     Port LDAP. 636 (LDAPS) par défaut — voir la note sécurité ci-dessous.
 
@@ -96,7 +103,9 @@ param(
     [string]$MemberAttribute = "uniqueMember",
     [string]$AppNameAttribute = "cn",
 
-    [string]$OutputCsv = (Join-Path $PSScriptRoot "LDAP_Applications_Roles_Audit.csv")
+    [string]$OutputCsv = (Join-Path $PSScriptRoot "LDAP_Applications_Roles_Audit.csv"),
+
+    [switch]$ResolveNested
 )
 
 Add-Type -AssemblyName System.DirectoryServices.Protocols
@@ -126,6 +135,24 @@ function Get-MemberNames {
         }
         ($dn -split ',')[0] -replace '^[^=]+=', ''
     }) -join "; "
+}
+
+function Get-EffectiveMemberNames {
+    # Membres effectifs (directs + via groupes imbriqués) d'un rôle, sous forme de noms de
+    # personnes. Une seule recherche par rôle avec la règle IN_CHAIN, exécutée par le contrôleur
+    # de domaine ; on ne remonte que les objets utilisateur (les groupes traversés ne sont pas
+    # des personnes). Retourne @{ Count; Names }.
+    param([string]$RoleDn)
+
+    $domainDn = (($BaseDN -split ',') | Where-Object { $_ -match '^DC=' }) -join ','
+    $escapedDn = $RoleDn.Replace('\', '\5c').Replace('(', '\28').Replace(')', '\29').Replace('*', '\2a')
+    $filter = "(&(objectCategory=person)(objectClass=user)(memberOf:1.2.840.113556.1.4.1941:=$escapedDn))"
+    [string[]]$attrs = @("cn")
+    $req = New-Object System.DirectoryServices.Protocols.SearchRequest(
+        $domainDn, $filter, [System.DirectoryServices.Protocols.SearchScope]::Subtree, $attrs)
+    $resp = $ldapConnection.SendRequest($req)
+    $names = @($resp.Entries | ForEach-Object { $_.Attributes["cn"][0] } | Sort-Object)
+    return @{ Count = $names.Count; Names = ($names -join "; ") }
 }
 
 ###############################################################
@@ -331,13 +358,20 @@ foreach ($appEntry in $searchResponse.Entries) {
     })
 
     foreach ($roleEntry in $roleSearchResponse.Entries) {
+        $memberCount = if ($roleEntry.Attributes[$MemberAttribute]) { $roleEntry.Attributes[$MemberAttribute].Count } else { 0 }
+        $memberNames = Get-MemberNames -MemberDNs $roleEntry.Attributes[$MemberAttribute]
+        if ($ResolveNested -and $MemberAttribute -eq "member") {
+            $effective = Get-EffectiveMemberNames -RoleDn $roleEntry.DistinguishedName
+            $memberCount = $effective.Count
+            $memberNames = $effective.Names
+        }
         [void]$resultArray.Add([PSCustomObject]@{
             Application     = $appName
             AppDescription  = $appDescription
             Role            = $roleEntry.Attributes["cn"][0]
             RoleDescription = if ($roleEntry.Attributes["description"]) { $roleEntry.Attributes["description"][0] } else { "" }
-            MemberCount     = if ($roleEntry.Attributes[$MemberAttribute]) { $roleEntry.Attributes[$MemberAttribute].Count } else { 0 }
-            Members         = Get-MemberNames -MemberDNs $roleEntry.Attributes[$MemberAttribute]
+            MemberCount     = $memberCount
+            Members         = $memberNames
         })
     }
 }
