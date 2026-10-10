@@ -2,6 +2,7 @@
 
 ![PowerShell](https://img.shields.io/badge/PowerShell-5391FE?style=for-the-badge&logo=powershell&logoColor=white)
 ![LDAP](https://img.shields.io/badge/LDAP-IAM%20Audit-0d1117?style=for-the-badge)
+[![Licence MIT](https://img.shields.io/badge/Licence-MIT-0d1117?style=for-the-badge)](LICENSE)
 
 Script PowerShell interrogeant un annuaire LDAP pour produire un export CSV
 Application / Rôle / Description — utile pour un audit d'accès applicatifs (IAM/GRC) :
@@ -241,3 +242,10 @@ Export obtenu : [`LDAP-App-Role-Audit-ForumSys.csv`](LDAP-App-Role-Audit-ForumSy
   représentation décimale espacée (des chiffres) au lieu du texte attendu — sans erreur, juste
   un résultat silencieusement faux. Décoder explicitement en UTF-8 quand `$_ -is [byte[]]`
   (voir `Get-MemberNames` dans le script).
+
+---
+
+## 📜 Licence
+
+Publié sous licence [MIT](LICENSE) © 2026 Anne-LaureS : réutilisation libre, à condition de conserver la
+mention de copyright. Fourni « tel quel », sans garantie.
